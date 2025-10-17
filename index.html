@@ -10,6 +10,7 @@
       margin: 0;
       padding: 0;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      transition: background 0.3s, color 0.3s;
     }
     body {
       background: #f5f7fa;
@@ -18,6 +19,11 @@
       align-items: flex-start;
       padding-top: 60px;
       min-height: 100vh;
+      color: #333;
+    }
+    body.dark {
+      background: #1e1e1e;
+      color: #eee;
     }
     .container {
       background: #fff;
@@ -27,11 +33,14 @@
       padding: 24px;
       box-shadow: 0 10px 25px rgba(0,0,0,0.1);
     }
+    body.dark .container {
+      background: #2a2a2a;
+      box-shadow: 0 10px 25px rgba(255,255,255,0.05);
+    }
     h1 {
       font-size: 28px;
       text-align: center;
       margin-bottom: 24px;
-      color: #333;
     }
     .input-section {
       display: flex;
@@ -44,6 +53,13 @@
       border: 1px solid #ccc;
       border-radius: 8px;
       font-size: 16px;
+      background: #fff;
+      color: #333;
+    }
+    body.dark .input-section input {
+      background: #333;
+      border: 1px solid #555;
+      color: #eee;
     }
     .input-section button {
       padding: 10px 18px;
@@ -69,21 +85,28 @@
       align-items: center;
       margin-bottom: 12px;
     }
+    body.dark li {
+      background: #333;
+    }
     .task-text {
       flex: 1;
       font-size: 16px;
-      color: #333;
     }
     .task-text.done {
       text-decoration: line-through;
       color: #888;
     }
+    .pinned {
+      background: #ffe8a1 !important;
+      font-weight: bold;
+    }
     .actions button {
       background: none;
       border: none;
       cursor: pointer;
-      margin-left: 10px;
+      margin-left: 8px;
       font-size: 16px;
+      color: inherit;
     }
     .actions button:hover {
       opacity: 0.7;
@@ -91,13 +114,31 @@
     h2 {
       margin-top: 30px;
       margin-bottom: 10px;
-      color: #444;
       font-size: 20px;
+    }
+    .dark-mode-toggle {
+      text-align: right;
+      margin-bottom: 10px;
+    }
+    .dark-mode-toggle button {
+      padding: 8px 12px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      background: #444;
+      color: white;
+    }
+    body.dark .dark-mode-toggle button {
+      background: #ddd;
+      color: #111;
     }
   </style>
 </head>
 <body>
   <div class="container">
+    <div class="dark-mode-toggle">
+      <button id="darkModeBtn">🌙 Dark Mode</button>
+    </div>
     <h1>📝 To-Do List</h1>
     <div class="input-section">
       <input type="text" id="taskInput" placeholder="Add a new task..." autofocus />
@@ -113,6 +154,17 @@
     const taskInput = document.getElementById('taskInput');
     const taskList = document.getElementById('taskList');
     const archivedList = document.getElementById('archivedList');
+    const darkModeBtn = document.getElementById('darkModeBtn');
+
+    let tasks = JSON.parse(localStorage.getItem('tasks')) || [];
+    let archived = JSON.parse(localStorage.getItem('archived')) || [];
+    let darkMode = localStorage.getItem('darkMode') === 'true';
+
+    if (darkMode) document.body.classList.add('dark');
+    updateDarkButton();
+
+    // Load tasks
+    renderTasks();
 
     // Submit on Enter
     taskInput.addEventListener('keypress', function(e) {
@@ -122,39 +174,91 @@
     });
 
     function addTask() {
-      const taskText = taskInput.value.trim();
-      if (taskText === '') return;
+      const text = taskInput.value.trim();
+      if (!text) return;
 
-      const li = document.createElement('li');
-      const taskSpan = document.createElement('span');
-      taskSpan.className = 'task-text';
-      taskSpan.textContent = taskText;
-
-      const actionsDiv = document.createElement('div');
-      actionsDiv.className = 'actions';
-
-      const doneBtn = document.createElement('button');
-      doneBtn.innerHTML = '✅';
-      doneBtn.onclick = () => taskSpan.classList.toggle('done');
-
-      const deleteBtn = document.createElement('button');
-      deleteBtn.innerHTML = '❌';
-      deleteBtn.onclick = () => archiveTask(li);
-
-      actionsDiv.appendChild(doneBtn);
-      actionsDiv.appendChild(deleteBtn);
-
-      li.appendChild(taskSpan);
-      li.appendChild(actionsDiv);
-
-      taskList.appendChild(li);
+      const newTask = { text, done: false, pinned: false };
+      tasks.push(newTask);
+      saveAndRender();
       taskInput.value = '';
       taskInput.focus();
     }
 
-    function archiveTask(taskItem) {
-      taskItem.querySelector('.actions').remove();
-      archivedList.appendChild(taskItem);
+    function toggleDone(index) {
+      tasks[index].done = !tasks[index].done;
+      saveAndRender();
+    }
+
+    function togglePin(index) {
+      tasks[index].pinned = !tasks[index].pinned;
+      saveAndRender();
+    }
+
+    function archiveTask(index) {
+      archived.push(tasks[index]);
+      tasks.splice(index, 1);
+      saveAndRender();
+    }
+
+    function saveAndRender() {
+      localStorage.setItem('tasks', JSON.stringify(tasks));
+      localStorage.setItem('archived', JSON.stringify(archived));
+      renderTasks();
+    }
+
+    function renderTasks() {
+      taskList.innerHTML = '';
+      archivedList.innerHTML = '';
+
+      // Sort pinned first
+      const sortedTasks = [...tasks].sort((a, b) => b.pinned - a.pinned);
+
+      sortedTasks.forEach((task, i) => {
+        const li = document.createElement('li');
+        if (task.pinned) li.classList.add('pinned');
+
+        const span = document.createElement('span');
+        span.className = 'task-text';
+        if (task.done) span.classList.add('done');
+        span.textContent = task.text;
+
+        const actions = document.createElement('div');
+        actions.className = 'actions';
+
+        const doneBtn = document.createElement('button');
+        doneBtn.innerHTML = '✅';
+        doneBtn.onclick = () => toggleDone(tasks.indexOf(task));
+
+        const pinBtn = document.createElement('button');
+        pinBtn.innerHTML = task.pinned ? '📌' : '📍';
+        pinBtn.onclick = () => togglePin(tasks.indexOf(task));
+
+        const delBtn = document.createElement('button');
+        delBtn.innerHTML = '❌';
+        delBtn.onclick = () => archiveTask(tasks.indexOf(task));
+
+        actions.append(doneBtn, pinBtn, delBtn);
+        li.append(span, actions);
+        taskList.append(li);
+      });
+
+      archived.forEach(task => {
+        const li = document.createElement('li');
+        li.textContent = task.text;
+        archivedList.append(li);
+      });
+    }
+
+    // DARK MODE
+    darkModeBtn.addEventListener('click', () => {
+      document.body.classList.toggle('dark');
+      darkMode = document.body.classList.contains('dark');
+      localStorage.setItem('darkMode', darkMode);
+      updateDarkButton();
+    });
+
+    function updateDarkButton() {
+      darkModeBtn.textContent = darkMode ? '☀️ Light Mode' : '🌙 Dark Mode';
     }
   </script>
 </body>
